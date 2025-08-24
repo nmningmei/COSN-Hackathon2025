@@ -193,7 +193,7 @@ def build_model_dictionary(model_name: str = 'None + Linear-SVM',
 
 
 
-def load_data(subj,radius = .04,mag=True,grad=True):
+def load_data(subj:int,radius:float = .04,):
     subject = 'subject'+str(subj)
     working_dir = os.path.join('../data/MEG', subject)
     working_data = np.sort(glob(os.path.join(working_dir, "cleaned", "unconscious-session*fif")))
