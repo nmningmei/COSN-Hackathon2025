@@ -30,14 +30,15 @@ from sklearn.tree import DecisionTreeClassifier
 
 from joblib import Parallel, delayed
 
-def get_neighbors_within_radius(pos, radius:float,):
+from typing import Any
+
+def get_neighbors_within_radius(pos, radius:float,) -> list[int | list[int] | list[list[int]] | list[list[list[Any]]]]:
     
     dist_mat = cdist(pos, pos)
     neighbors = [np.where(dist_mat[i] <= radius)[0].tolist() for i in range(len(pos))]
     return neighbors
 
-def get_chanpo_fif(subj,radius):
-
+def get_chanpo_fif(subj:int,radius:float):
     datadir = r'../data'
     sub_fif_dir = r'cleaned/unconscious-session_1-block_1-epo.fif'
     epo_fif_dir = os.path.join(datadir,'MEG',f'subject{subj}',sub_fif_dir)
