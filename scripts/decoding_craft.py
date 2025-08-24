@@ -85,8 +85,6 @@ def build_model_dictionary(model_name: str = 'None + Linear-SVM',
                            tol: float = 1e-3,
                            ):
     """
-
-
     Parameters
     ----------
     model_name : str
