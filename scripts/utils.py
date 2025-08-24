@@ -84,7 +84,7 @@ def get_channel_position(example_epochs, radius: float = 0.04):
 
 
     mag_idx_idx = get_neighbors_within_radius(mag_pos, radius)
-    # 判断sphere中是否只有中心点
+    # 判断sphere中是否含有neighbors
     for idx in range( len( mag_idx_idx ) ):
         if len( mag_idx_idx[idx] )  <2:
             raise ValueError("radius值过小")
@@ -93,7 +93,7 @@ def get_channel_position(example_epochs, radius: float = 0.04):
     grad_idx_idx = np.arange(len(grad_pos)).reshape(-1, 2)
     grad_idx_idx = [grad_idx_idx[item].flatten() for item in mag_idx_idx]
 
-    # 判断sphere中是否只有中心点
+    # 判断sphere中是否含有neighbors
     for idx in range( len( grad_idx_idx ) ) :
         if len( grad_idx_idx[idx] ) <4:
             raise ValueError("radius值过小")
@@ -141,7 +141,7 @@ def build_model_dictionary(model_name: str = 'None + Linear-SVM',
     C : float, optional
         DESCRIPTION. The default is 1.
     tol : float, optional
-        DESCRIPTION. The default is 1e-2.
+        DESCRIPTION. The default is 1e-3.
 
     Returns
     -------
