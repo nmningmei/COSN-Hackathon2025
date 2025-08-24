@@ -1,3 +1,12 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Aug 23 2025
+
+@author: 黄若杰、宋奕德、朱江岳、郝守彬、梅宁
+
+下面的函数主要用于MEG searchlight temporal decoding任务中
+
+"""
 from glob import glob
 
 import numpy as np
@@ -21,7 +30,8 @@ from sklearn.tree import DecisionTreeClassifier
 
 from joblib import Parallel, delayed
 
-def get_neighbors_within_radius(pos, radius):
+def get_neighbors_within_radius(pos, radius:float,):
+    
     dist_mat = cdist(pos, pos)
     neighbors = [np.where(dist_mat[i] <= radius)[0].tolist() for i in range(len(pos))]
     return neighbors
