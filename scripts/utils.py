@@ -102,6 +102,15 @@ def get_channel_position(example_epochs, radius: float = 0.04):
 
 
 def str2int(x):
+    """
+    Parameters
+    ----------
+    x
+        DESCRIPTION. 
+    Return
+    ----------
+    int
+    """
     if type(x) is str:
         return int(re.findall(r'\d+', x)[0])
     else:
