@@ -35,16 +35,42 @@ from typing import Any
 
 def get_neighbors_within_radius(pos, radius: float, ) -> list[
     int | list[int] | list[list[int]] | list[list[list[Any]]]]:
+
+    """
+    获取通道位置后输入该函数，设定sphere半径
+    计算在sphere中的channel的索引并返回
+
+    Parameters
+    ----------
+    pos: 所有通道的三维坐标
+    radius: searchlight sphere半径
+
+    Returns
+    -------
+
+    neighbors: 每个sphere内的mag索引组成的嵌套列表
+    """
+
     dist_mat = cdist(pos, pos)
     neighbors = [np.where(dist_mat[i] <= radius)[0].tolist() for i in range(len(pos))]
     return neighbors
 
 
-def get_chanpo_fif(example_epochs, radius: float):
-    # datadir = r'../data'
-    # sub_fif_dir = r'cleaned/unconscious-session_1-block_1-epo.fif'
-    # epo_fif_dir = os.path.join(datadir, 'MEG', f'subject{subj}', sub_fif_dir)
-    # example_epochs = mne.read_epochs(example_epochs_dir, preload=False)
+def get_channel_position(example_epochs, radius: float = 0.04):
+    """
+    通过被试的epoch信息，提取以每个channel为中心的sphere内mag、grad索引
+
+    Parameters
+    ----------
+    example_epochs: 被试的epochs数据
+    radius: searchlight sphere半径，默认值0.04
+
+    Returns
+    -------
+    mag_idx_idx: list, 每个sphere内的mag索引组成的嵌套列表
+    grad_idx_idx: list, 每个sphere内的grad索引组成的嵌套列表
+
+    """
 
     # 提取磁强计索引
     mag_idx = mne.pick_types(example_epochs.info, meg='mag')
@@ -56,16 +82,24 @@ def get_chanpo_fif(example_epochs, radius: float):
     mag_pos = [example_epochs.info['chs'][i]['loc'][:3] for i in mag_idx]
 
     # 获取梯度计的位置
-    grad_pos_l = [example_epochs.info['chs'][i]['loc'][:3] for i in grad_idx]
-    grad_pos = np.array(grad_pos_l)
-    # grad_pos_102 = grad_pos.reshape(-1,2,3)
-    # grad_pos_c = np.mean(grad_pos_102,axis = 1)
+    grad_pos = [example_epochs.info['chs'][i]['loc'][:3] for i in grad_idx]
 
-    #
+
+
     mag_idx_idx = get_neighbors_within_radius(mag_pos, radius)
-    #
+    # 判断sphere中是否只有中心点
+    for idx in range( len( mag_idx_idx ) ):
+        if len( mag_idx_idx[idx] )  <2:
+            raise ValueError("radius值过小")
+
+
     grad_idx_idx = np.arange(len(grad_pos)).reshape(-1, 2)
     grad_idx_idx = [grad_idx_idx[item].flatten() for item in mag_idx_idx]
+
+    # 判断sphere中是否只有中心点
+    for idx in range( len( grad_idx_idx ) ) :
+        if len( grad_idx_idx[idx] ) <4:
+            raise ValueError("radius值过小")
 
     return mag_idx_idx, grad_idx_idx
 
@@ -192,40 +226,41 @@ def build_model_dictionary(model_name: str = 'None + Linear-SVM',
     return make_pipeline(*pipeline)
 
 def get_neighbors_idx(epochs, radius:float):
-    mag_idx_idx, grad_idx_idx = get_chanpo_fif(epochs, radius)
+    mag_idx_idx, grad_idx_idx = get_channel_position(epochs, radius)
     time = np.arange(epochs.times.shape[0])
     maga_for_loop_mag = list(itertools.product(mag_idx_idx, time))
     maga_for_loop_grad = list(itertools.product(grad_idx_idx, time))
     return maga_for_loop_mag, maga_for_loop_grad
 
-def load_data(subj: int, radius: float = .04):
+def load_data(working_data, working_beh, radius: float = .04):
     """
-    Load MEG data and behavioral data for a given subject.
+    Load MEG epochs and corresponding behavioral data, and prepare searchlight indices.
 
     Parameters
     ----------
-    subj : int
-        Subject number to load the data for.
+    working_data : list of str
+        List of file paths to the MEG epochs data (e.g., .fif files).
+    working_beh : list of str
+        List of file paths to the behavioral data (CSV files), aligned with `working_data`.
     radius : float, optional
-        Radius for neighborhood search in the MEG data. Default is 0.04.
+        Radius (in meters) for defining sensor neighborhoods in the MEG searchlight.
+        Default is 0.04.
 
     Returns
     -------
-    maga_for_loop : list
-        List of tuples containing magnetic sensor indices and time points for decoding.
+    maga_for_loop : list of tuple
+        List of (sensor_neighbors, time_point) pairs to be used for searchlight decoding.
+        - sensor_neighbors : list[int], indices of neighboring magnetometer sensors
+        - time_point : int, index of a time sample
     epochs_unconscious : mne.Epochs
-        MEG epochs data for unconscious trials.
+        Concatenated MEG epochs for unconscious trials (where `visible.keys_raw == 1`).
     epochs_conscious : mne.Epochs
-        MEG epochs data for conscious trials.
+        Concatenated MEG epochs for conscious trials (where `visible.keys_raw == 3`).
     df_unconscious : pandas.DataFrame
-        Behavioral data for unconscious trials.
+        Behavioral data rows corresponding to unconscious trials.
     df_conscious : pandas.DataFrame
-        Behavioral data for conscious trials.
+        Behavioral data rows corresponding to conscious trials.
     """
-    subject = 'subject' + str(subj)
-    working_dir = os.path.join('../data/MEG', subject)
-    working_data = np.sort(glob(os.path.join(working_dir, "cleaned", "unconscious-session*fif")))
-    working_beha = np.sort(glob(os.path.join(working_dir, "cleaned", "unconscious-session*csv")))
 
     epochs = []
     df = []
@@ -234,7 +269,7 @@ def load_data(subj: int, radius: float = .04):
         df_temp = pd.read_csv(beha_file)
         df.append(df_temp)
     epochs = mne.concatenate_epochs(epochs)
-    #     epochs.resample(100)
+
     df = pd.concat(df)
     df["visible.keys_raw"] = df["visible.keys_raw"].apply(str2int)
     idx_unconscious = df['visible.keys_raw'] == 1
@@ -244,26 +279,12 @@ def load_data(subj: int, radius: float = .04):
     epochs_conscious = epochs[idx_conscious]
     df_conscious = df[idx_conscious]
 
-    mag_idx_idx, grad_idx_idx = get_chanpo_fif(subj, radius)
+    mag_idx_idx, grad_idx_idx = get_channel_position(epochs, radius)
     time = np.arange(epochs.times.shape[0])
     maga_for_loop = list(itertools.product(mag_idx_idx, time))
     del epochs
     return maga_for_loop, epochs_unconscious, epochs_conscious, df_unconscious, df_conscious
 
-
-#     if mag & grad:
-#
-#         mag_data=epochs.copy().pick(picks='mag').pick(mag_idx_idx[0])
-#         grad_data=epochs.copy().pick(picks='grad').pick(grad_idx_idx[0])
-#
-#
-#
-#
-#     mag_data=epochs.copy().pick(picks='mag').pick(mag_idx_idx[0])
-#
-label_map = {"Nonliving_Things": 1,
-             "Living_Things": 0,
-             }
 
 
 def decode_within_sphere(epoch_data, labels, cv, model_name='None + Linear-SVM'):
@@ -297,7 +318,16 @@ def decode_within_sphere(epoch_data, labels, cv, model_name='None + Linear-SVM')
 if __name__ == '__main__':
     subj = 9
     subject = 'subject' + str(subj)
-    maga_for_loop, epochs_unconscious, epochs_conscious, df_unconscious, df_conscious = load_data(9, .04, True, True)
+    working_dir = os.path.join('../data/MEG', subject)
+    working_data = np.sort(glob(os.path.join(working_dir, "cleaned", "unconscious-session*fif")))
+    working_beha = np.sort(glob(os.path.join(working_dir, "cleaned", "unconscious-session*csv")))
+
+    label_map = {
+        "Nonliving_Things": 1,
+        "Living_Things"   : 0,
+    }
+
+    maga_for_loop, epochs_unconscious, epochs_conscious, df_unconscious, df_conscious = load_data(working_data, working_beha)
     labels_unconscious = df_unconscious['category'].map(label_map).values
     labels_conscious = df_conscious['category'].map(label_map).values
 
