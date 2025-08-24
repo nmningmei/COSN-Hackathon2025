@@ -304,12 +304,8 @@ def load_data(working_data, working_beha, radius: float = .04):
     epochs_conscious = epochs[idx_conscious]
     df_conscious = df[idx_conscious]
 
-    mag_idx_idx, grad_idx_idx = get_channel_position(epochs, radius)
-    time = np.arange(epochs.times.shape[0])
-    maga_for_loop = list(itertools.product(mag_idx_idx, time))
-    del epochs
-    return maga_for_loop, epochs_unconscious, epochs_conscious, df_unconscious, df_conscious
-
+    
+    return epochs_unconscious, epochs_conscious, df_unconscious, df_conscious
 
 
 def decode_within_sphere(epoch_data, labels, cv, model_name='None + Linear-SVM'):
